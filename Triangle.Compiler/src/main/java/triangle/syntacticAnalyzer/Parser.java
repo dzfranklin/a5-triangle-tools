@@ -280,7 +280,11 @@ public class Parser {
 				accept(Token.Kind.RPAREN);
 				finish(commandPos);
 				commandAST = new CallCommand(iAST, apsAST, commandPos);
-
+			} else if (currentToken.kind == Token.Kind.OPERATOR && currentToken.spelling.equals("++")) {
+				Vname vAST = parseRestOfVname(iAST);
+				acceptIt();
+				finish(commandPos);
+				commandAST = new AssignCommand(vAST, eAST, commandPos);
 			} else {
 
 				Vname vAST = parseRestOfVname(iAST);
