@@ -98,6 +98,7 @@ import triangle.abstractSyntaxTrees.vnames.SimpleVname;
 import triangle.abstractSyntaxTrees.vnames.SubscriptVname;
 import triangle.abstractSyntaxTrees.vnames.Vname;
 import triangle.codeGenerator.entities.*;
+import triangle.debug.DebugPositionEmitter;
 
 public final class Encoder implements ActualParameterVisitor<Frame, Integer>,
 		ActualParameterSequenceVisitor<Frame, Integer>, ArrayAggregateVisitor<Frame, Integer>,
@@ -106,28 +107,41 @@ public final class Encoder implements ActualParameterVisitor<Frame, Integer>,
 		OperatorVisitor<Frame, Void>, ProgramVisitor<Frame, Void>, RecordAggregateVisitor<Frame, Integer>,
 		TypeDenoterVisitor<Frame, Integer>, VnameVisitor<Frame, RuntimeEntity> {
 
+	DebugPositionEmitter debugPositionEmitter;
+
+	public void setDebugPositionEmitter(DebugPositionEmitter emitter) {
+		debugPositionEmitter = emitter;
+	}
+
 	// Commands
 	@Override
 	public Void visitAssignCommand(AssignCommand ast, Frame frame) {
+        debugVisitStart(ast);
 		var valSize = ast.E.visit(this, frame);
 		encodeStore(ast.V, frame.expand(valSize), valSize);
-		return null;
+		debugVisitEnd();
+        return null;
 	}
 
 	@Override
 	public Void visitCallCommand(CallCommand ast, Frame frame) {
+        debugVisitStart(ast);
 		var argsSize = ast.APS.visit(this, frame);
 		ast.I.visit(this, frame.replace(argsSize));
-		return null;
+		debugVisitEnd();
+        return null;
 	}
 
 	@Override
 	public Void visitEmptyCommand(EmptyCommand ast, Frame frame) {
-		return null;
+        debugVisitStart(ast);
+		debugVisitEnd();
+        return null;
 	}
 
 	@Override
 	public Void visitIfCommand(IfCommand ast, Frame frame) {
+        debugVisitStart(ast);
 		ast.E.visit(this, frame);
 		var jumpifAddr = emitter.emit(OpCode.JUMPIF, Machine.falseRep, Register.CB, 0);
 		ast.C1.visit(this, frame);
@@ -135,86 +149,107 @@ public final class Encoder implements ActualParameterVisitor<Frame, Integer>,
 		emitter.patch(jumpifAddr);
 		ast.C2.visit(this, frame);
 		emitter.patch(jumpAddr);
-		return null;
+		debugVisitEnd();
+        return null;
 	}
 
 	@Override
 	public Void visitLetCommand(LetCommand ast, Frame frame) {
+        debugVisitStart(ast);
 		var extraSize = ast.D.visit(this, frame);
 		ast.C.visit(this, frame.expand(extraSize));
 		if (extraSize > 0) {
 			emitter.emit(OpCode.POP, extraSize);
 		}
-		return null;
+		debugVisitEnd();
+        return null;
 	}
 
 	@Override
 	public Void visitSequentialCommand(SequentialCommand ast, Frame frame) {
+        debugVisitStart(ast);
 		ast.C1.visit(this, frame);
 		ast.C2.visit(this, frame);
-		return null;
+		debugVisitEnd();
+        return null;
 	}
 
 	@Override
 	public Void visitWhileCommand(WhileCommand ast, Frame frame) {
+        debugVisitStart(ast);
 		var jumpAddr = emitter.emit(OpCode.JUMP, 0, Register.CB, 0);
 		var loopAddr = emitter.getNextInstrAddr();
 		ast.C.visit(this, frame);
 		emitter.patch(jumpAddr);
 		ast.E.visit(this, frame);
 		emitter.emit(OpCode.JUMPIF, Machine.trueRep, Register.CB, loopAddr);
-		return null;
+		debugVisitEnd();
+        return null;
 	}
 
 	@Override
 	public Void visitRepeatCommand(RepeatCommand ast, Frame frame) {
+        debugVisitStart(ast);
 		var loopAddr = emitter.getNextInstrAddr();
 		ast.C.visit(this, frame);
 		ast.E.visit(this, frame);
 		emitter.emit(OpCode.JUMPIF, Machine.falseRep, Register.CB, loopAddr);
-		return null;
+		debugVisitEnd();
+        return null;
 	}
 
 	// Expressions
 	@Override
 	public Integer visitArrayExpression(ArrayExpression ast, Frame frame) {
+        debugVisitStart(ast);
 		ast.type.visit(this, frame);
-		return ast.AA.visit(this, frame);
+        var valSize = ast.AA.visit(this, frame);
+		debugVisitEnd();
+		return valSize;
 	}
 
 	@Override
 	public Integer visitBinaryExpression(BinaryExpression ast, Frame frame) {
+        debugVisitStart(ast);
 		var valSize = ast.type.visit(this);
 		var valSize1 = ast.E1.visit(this, frame);
 		var frame1 = frame.expand(valSize1);
 		var valSize2 = ast.E2.visit(this, frame1);
 		var frame2 = frame.replace(valSize1 + valSize2);
 		ast.O.visit(this, frame2);
-		return valSize;
+		debugVisitEnd();
+        return valSize;
 	}
 
 	@Override
 	public Integer visitCallExpression(CallExpression ast, Frame frame) {
+        debugVisitStart(ast);
 		var valSize = ast.type.visit(this);
 		var argsSize = ast.APS.visit(this, frame);
 		ast.I.visit(this, frame.replace(argsSize));
-		return valSize;
+		debugVisitEnd();
+        return valSize;
 	}
 
 	@Override
 	public Integer visitCharacterExpression(CharacterExpression ast, Frame frame) {
+        debugVisitStart(ast);
 		var valSize = ast.type.visit(this);
 		emitter.emit(OpCode.LOADL, ast.CL.getValue());
-		return valSize;
+		debugVisitEnd();
+        return valSize;
 	}
 
 	@Override
 	public Integer visitEmptyExpression(EmptyExpression ast, Frame frame) {
-		return 0;
+        debugVisitStart(ast);
+		debugVisitEnd();
+        return 0;
 	}
 
 	@Override
 	public Integer visitIfExpression(IfExpression ast, Frame frame) {
+        debugVisitStart(ast);
 		ast.type.visit(this);
 		ast.E1.visit(this, frame);
 		var jumpifAddr = emitter.emit(OpCode.JUMPIF, Machine.falseRep, Register.CB, 0);
@@ -223,18 +258,22 @@ public final class Encoder implements ActualParameterVisitor<Frame, Integer>,
 		emitter.patch(jumpifAddr);
 		valSize = ast.E3.visit(this, frame);
 		emitter.patch(jumpAddr);
-		return valSize;
+		debugVisitEnd();
+        return valSize;
 	}
 
 	@Override
 	public Integer visitIntegerExpression(IntegerExpression ast, Frame frame) {
+        debugVisitStart(ast);
 		var valSize = ast.type.visit(this);
 		emitter.emit(OpCode.LOADL, ast.IL.getValue());
-		return valSize;
+		debugVisitEnd();
+        return valSize;
 	}
 
 	@Override
 	public Integer visitLetExpression(LetExpression ast, Frame frame) {
+        debugVisitStart(ast);
 		ast.type.visit(this);
 		var extraSize = ast.D.visit(this, frame);
 		var frame1 = frame.expand(extraSize);
@@ -242,38 +281,49 @@ public final class Encoder implements ActualParameterVisitor<Frame, Integer>,
 		if (extraSize > 0) {
 			emitter.emit(OpCode.POP, valSize, extraSize);
 		}
-		return valSize;
+		debugVisitEnd();
+        return valSize;
 	}
 
 	@Override
 	public Integer visitRecordExpression(RecordExpression ast, Frame frame) {
+        debugVisitStart(ast);
 		ast.type.visit(this);
-		return ast.RA.visit(this, frame);
+		var valSize = ast.RA.visit(this, frame);
+		debugVisitEnd();
+        return valSize;
 	}
 
 	@Override
 	public Integer visitUnaryExpression(UnaryExpression ast, Frame frame) {
+        debugVisitStart(ast);
 		var valSize = ast.type.visit(this);
 		ast.E.visit(this, frame);
 		ast.O.visit(this, frame.replace(valSize));
-		return valSize;
+		debugVisitEnd();
+        return valSize;
 	}
 
 	@Override
 	public Integer visitVnameExpression(VnameExpression ast, Frame frame) {
+        debugVisitStart(ast);
 		var valSize = ast.type.visit(this);
 		encodeFetch(ast.V, frame, valSize);
-		return valSize;
+		debugVisitEnd();
+        return valSize;
 	}
 
 	// Declarations
 	@Override
 	public Integer visitBinaryOperatorDeclaration(BinaryOperatorDeclaration ast, Frame frame) {
-		return 0;
+        debugVisitStart(ast);
+		debugVisitEnd();
+        return 0;
 	}
 
 	@Override
 	public Integer visitConstDeclaration(ConstDeclaration ast, Frame frame) {
+        debugVisitStart(ast);
 		var extraSize = 0;
 		if (ast.E.isLiteral()) {
 			ast.entity = new KnownValue(ast.E.type.getSize(), ast.E.getValue());
@@ -283,11 +333,13 @@ public final class Encoder implements ActualParameterVisitor<Frame, Integer>,
 			extraSize = valSize;
 		}
 		writeTableDetails(ast);
-		return extraSize;
+		debugVisitEnd();
+        return extraSize;
 	}
 
 	@Override
 	public Integer visitFuncDeclaration(FuncDeclaration ast, Frame frame) {
+        debugVisitStart(ast);
 		var argsSize = 0;
 		var valSize = 0;
 
@@ -304,11 +356,13 @@ public final class Encoder implements ActualParameterVisitor<Frame, Integer>,
 		}
 		emitter.emit(OpCode.RETURN, valSize, argsSize);
 		emitter.patch(jumpAddr);
+		debugVisitEnd();
 		return 0;
 	}
 
 	@Override
 	public Integer visitProcDeclaration(ProcDeclaration ast, Frame frame) {
+        debugVisitStart(ast);
 		var argsSize = 0;
 		var jumpAddr = emitter.emit(OpCode.JUMP, 0, Register.CB, 0);
 		ast.entity = new KnownRoutine(Machine.closureSize, frame.getLevel(), emitter.getNextInstrAddr());
@@ -323,169 +377,220 @@ public final class Encoder implements ActualParameterVisitor<Frame, Integer>,
 		}
 		emitter.emit(OpCode.RETURN, argsSize);
 		emitter.patch(jumpAddr);
+		debugVisitEnd();
 		return 0;
 	}
 
 	@Override
 	public Integer visitSequentialDeclaration(SequentialDeclaration ast, Frame frame) {
+        debugVisitStart(ast);
 		var extraSize1 = ast.D1.visit(this, frame);
 		var frame1 = frame.expand(extraSize1);
 		var extraSize2 = ast.D2.visit(this, frame1);
-		return extraSize1 + extraSize2;
+		debugVisitEnd();
+        return extraSize1 + extraSize2;
 	}
 
 	@Override
 	public Integer visitTypeDeclaration(TypeDeclaration ast, Frame frame) {
+        debugVisitStart(ast);
 		// just to ensure the type's representation is decided
 		ast.T.visit(this);
-		return 0;
+		debugVisitEnd();
+        return 0;
 	}
 
 	@Override
 	public Integer visitUnaryOperatorDeclaration(UnaryOperatorDeclaration ast, Frame frame) {
-		return 0;
+        debugVisitStart(ast);
+		debugVisitEnd();
+        return 0;
 	}
 
 	@Override
 	public Integer visitVarDeclaration(VarDeclaration ast, Frame frame) {
+        debugVisitStart(ast);
 		var extraSize = ast.T.visit(this);
 		emitter.emit(OpCode.PUSH, extraSize);
 		ast.entity = new KnownAddress(Machine.addressSize, frame);
 		writeTableDetails(ast);
-		return extraSize;
+		debugVisitEnd();
+        return extraSize;
 	}
 
 	// Array Aggregates
 	@Override
 	public Integer visitMultipleArrayAggregate(MultipleArrayAggregate ast, Frame frame) {
+        debugVisitStart(ast);
 		var elemSize = ast.E.visit(this, frame);
 		var frame1 = frame.expand(elemSize);
 		var arraySize = ast.AA.visit(this, frame1);
-		return elemSize + arraySize;
+		debugVisitEnd();
+        return elemSize + arraySize;
 	}
 
 	@Override
 	public Integer visitSingleArrayAggregate(SingleArrayAggregate ast, Frame frame) {
-		return ast.E.visit(this, frame);
+        debugVisitStart(ast);
+        var size = ast.E.visit(this, frame);
+		debugVisitEnd();
+		return size;
 	}
 
 	// Record Aggregates
 	@Override
 	public Integer visitMultipleRecordAggregate(MultipleRecordAggregate ast, Frame frame) {
+        debugVisitStart(ast);
 		var fieldSize = ast.E.visit(this, frame);
 		var frame1 = frame.expand(fieldSize);
 		var recordSize = ast.RA.visit(this, frame1);
-		return fieldSize + recordSize;
+		debugVisitEnd();
+        return fieldSize + recordSize;
 	}
 
 	@Override
 	public Integer visitSingleRecordAggregate(SingleRecordAggregate ast, Frame frame) {
-		return ast.E.visit(this, frame);
+        debugVisitStart(ast);
+        var size = ast.E.visit(this, frame);
+		debugVisitEnd();
+		return size;
 	}
 
 	// Formal Parameters
 	@Override
 	public Integer visitConstFormalParameter(ConstFormalParameter ast, Frame frame) {
+        debugVisitStart(ast);
 		var valSize = ast.T.visit(this);
 		ast.entity = new UnknownValue(valSize, frame.getLevel(), -frame.getSize() - valSize);
 		writeTableDetails(ast);
-		return valSize;
+		debugVisitEnd();
+        return valSize;
 	}
 
 	@Override
 	public Integer visitFuncFormalParameter(FuncFormalParameter ast, Frame frame) {
+        debugVisitStart(ast);
 		var argsSize = Machine.closureSize;
 		ast.entity = new UnknownRoutine(Machine.closureSize, frame.getLevel(), -frame.getSize() - argsSize);
 		writeTableDetails(ast);
-		return argsSize;
+		debugVisitEnd();
+        return argsSize;
 	}
 
 	@Override
 	public Integer visitProcFormalParameter(ProcFormalParameter ast, Frame frame) {
+        debugVisitStart(ast);
 		var argsSize = Machine.closureSize;
 		ast.entity = new UnknownRoutine(Machine.closureSize, frame.getLevel(), -frame.getSize() - argsSize);
 		writeTableDetails(ast);
-		return argsSize;
+		debugVisitEnd();
+        return argsSize;
 	}
 
 	@Override
 	public Integer visitVarFormalParameter(VarFormalParameter ast, Frame frame) {
+        debugVisitStart(ast);
 		ast.T.visit(this);
 		ast.entity = new UnknownAddress(Machine.addressSize, frame.getLevel(), -frame.getSize() - Machine.addressSize);
 		writeTableDetails(ast);
-		return Machine.addressSize;
+		debugVisitEnd();
+        return Machine.addressSize;
 	}
 
 	@Override
 	public Integer visitEmptyFormalParameterSequence(EmptyFormalParameterSequence ast, Frame frame) {
-		return 0;
+        debugVisitStart(ast);
+		debugVisitEnd();
+        return 0;
 	}
 
 	@Override
 	public Integer visitMultipleFormalParameterSequence(MultipleFormalParameterSequence ast, Frame frame) {
+        debugVisitStart(ast);
 		var argsSize1 = ast.FPS.visit(this, frame);
 		var frame1 = frame.expand(argsSize1);
 		var argsSize2 = ast.FP.visit(this, frame1);
-		return argsSize1 + argsSize2;
+		debugVisitEnd();
+        return argsSize1 + argsSize2;
 	}
 
 	@Override
 	public Integer visitSingleFormalParameterSequence(SingleFormalParameterSequence ast, Frame frame) {
-		return ast.FP.visit(this, frame);
+        debugVisitStart(ast);
+		debugVisitEnd();
+        return ast.FP.visit(this, frame);
 	}
 
 	// Actual Parameters
 	@Override
 	public Integer visitConstActualParameter(ConstActualParameter ast, Frame frame) {
-		return ast.E.visit(this, frame);
+        debugVisitStart(ast);
+		debugVisitEnd();
+        return ast.E.visit(this, frame);
 	}
 
 	@Override
 	public Integer visitFuncActualParameter(FuncActualParameter ast, Frame frame) {
+        debugVisitStart(ast);
 		var routineEntity = (RoutineEntity) ast.I.decl.entity;
 		routineEntity.encodeFetch(emitter, frame);
-		return Machine.closureSize;
+		debugVisitEnd();
+        return Machine.closureSize;
 	}
 
 	@Override
 	public Integer visitProcActualParameter(ProcActualParameter ast, Frame frame) {
+        debugVisitStart(ast);
 		var routineEntity = (RoutineEntity) ast.I.decl.entity;
 		routineEntity.encodeFetch(emitter, frame);
-		return Machine.closureSize;
+		debugVisitEnd();
+        return Machine.closureSize;
 	}
 
 	@Override
 	public Integer visitVarActualParameter(VarActualParameter ast, Frame frame) {
+        debugVisitStart(ast);
 		encodeFetchAddress(ast.V, frame);
-		return Machine.addressSize;
+		debugVisitEnd();
+        return Machine.addressSize;
 	}
 
 	@Override
 	public Integer visitEmptyActualParameterSequence(EmptyActualParameterSequence ast, Frame frame) {
-		return 0;
+        debugVisitStart(ast);
+		debugVisitEnd();
+        return 0;
 	}
 
 	@Override
 	public Integer visitMultipleActualParameterSequence(MultipleActualParameterSequence ast, Frame frame) {
+        debugVisitStart(ast);
 		var argsSize1 = ast.AP.visit(this, frame);
 		var frame1 = frame.expand(argsSize1);
 		var argsSize2 = ast.APS.visit(this, frame1);
-		return argsSize1 + argsSize2;
+		debugVisitEnd();
+        return argsSize1 + argsSize2;
 	}
 
 	@Override
 	public Integer visitSingleActualParameterSequence(SingleActualParameterSequence ast, Frame frame) {
-		return ast.AP.visit(this, frame);
+        debugVisitStart(ast);
+        var size = ast.AP.visit(this, frame);
+		debugVisitEnd();
+		return size;
 	}
 
 	// Type Denoters
 	@Override
 	public Integer visitAnyTypeDenoter(AnyTypeDenoter ast, Frame frame) {
-		return 0;
+        debugVisitStart(ast);
+		debugVisitEnd();
+        return 0;
 	}
 
 	@Override
 	public Integer visitArrayTypeDenoter(ArrayTypeDenoter ast, Frame frame) {
+        debugVisitStart(ast);
 		int typeSize;
 		if (ast.entity == null) {
 			var elemSize = ast.T.visit(this);
@@ -495,48 +600,60 @@ public final class Encoder implements ActualParameterVisitor<Frame, Integer>,
 		} else {
 			typeSize = ast.entity.getSize();
 		}
-		return typeSize;
+		debugVisitEnd();
+        return typeSize;
 	}
 
 	@Override
 	public Integer visitBoolTypeDenoter(BoolTypeDenoter ast, Frame frame) {
+        debugVisitStart(ast);
 		if (ast.entity == null) {
 			ast.entity = new TypeRepresentation(Machine.booleanSize);
 			writeTableDetails(ast);
 		}
-		return Machine.booleanSize;
+		debugVisitEnd();
+        return Machine.booleanSize;
 	}
 
 	@Override
 	public Integer visitCharTypeDenoter(CharTypeDenoter ast, Frame frame) {
+        debugVisitStart(ast);
 		if (ast.entity == null) {
 			ast.entity = new TypeRepresentation(Machine.characterSize);
 			writeTableDetails(ast);
 		}
-		return Machine.characterSize;
+		debugVisitEnd();
+        return Machine.characterSize;
 	}
 
 	@Override
 	public Integer visitErrorTypeDenoter(ErrorTypeDenoter ast, Frame frame) {
-		return 0;
+        debugVisitStart(ast);
+		debugVisitEnd();
+        return 0;
 	}
 
 	@Override
 	public Integer visitSimpleTypeDenoter(SimpleTypeDenoter ast, Frame frame) {
-		return 0;
+        debugVisitStart(ast);
+		debugVisitEnd();
+        return 0;
 	}
 
 	@Override
 	public Integer visitIntTypeDenoter(IntTypeDenoter ast, Frame frame) {
+        debugVisitStart(ast);
 		if (ast.entity == null) {
 			ast.entity = new TypeRepresentation(Machine.integerSize);
 			writeTableDetails(ast);
 		}
-		return Machine.integerSize;
+		debugVisitEnd();
+        return Machine.integerSize;
 	}
 
 	@Override
 	public Integer visitRecordTypeDenoter(RecordTypeDenoter ast, Frame frame) {
+        debugVisitStart(ast);
 		int typeSize;
 		if (ast.entity == null) {
 			typeSize = ast.FT.visit(this, frame);
@@ -545,15 +662,17 @@ public final class Encoder implements ActualParameterVisitor<Frame, Integer>,
 		} else {
 			typeSize = ast.entity.getSize();
 		}
-		return typeSize;
+		debugVisitEnd();
+        return typeSize;
 	}
 
 	@Override
 	public Integer visitMultipleFieldTypeDenoter(MultipleFieldTypeDenoter ast, Frame frame) {
+        debugVisitStart(ast);
 		if (frame == null) { // in this case, we're just using the frame to wrap up the size
 			frame = Frame.Initial;
 		}
-		
+
 		var offset = frame.getSize();
 		int fieldSize;
 		if (ast.entity == null) {
@@ -566,11 +685,13 @@ public final class Encoder implements ActualParameterVisitor<Frame, Integer>,
 
 		var offset1 = frame.replace(offset + fieldSize);
 		var recSize = ast.FT.visit(this, offset1);
-		return fieldSize + recSize;
+		debugVisitEnd();
+        return fieldSize + recSize;
 	}
 
 	@Override
 	public Integer visitSingleFieldTypeDenoter(SingleFieldTypeDenoter ast, Frame frame) {
+        debugVisitStart(ast);
 		var offset = frame.getSize();
 		int fieldSize;
 		if (ast.entity == null) {
@@ -581,53 +702,67 @@ public final class Encoder implements ActualParameterVisitor<Frame, Integer>,
 			fieldSize = ast.entity.getSize();
 		}
 
-		return fieldSize;
+		debugVisitEnd();
+        return fieldSize;
 	}
 
 	// Literals, Identifiers and Operators
 	@Override
 	public Void visitCharacterLiteral(CharacterLiteral ast, Void arg) {
-		return null;
+        debugVisitStart(ast);
+		debugVisitEnd();
+        return null;
 	}
 
 	@Override
 	public Void visitIdentifier(Identifier ast, Frame frame) {
+        debugVisitStart(ast);
 		var routineEntity = (RoutineEntity) ast.decl.entity;
 		routineEntity.encodeCall(emitter, frame);
-		return null;
+		debugVisitEnd();
+        return null;
 	}
 
 	@Override
 	public Void visitIntegerLiteral(IntegerLiteral ast, Void arg) {
-		return null;
+        debugVisitStart(ast);
+		debugVisitEnd();
+        return null;
 	}
 
 	@Override
 	public Void visitOperator(Operator ast, Frame frame) {
+        debugVisitStart(ast);
 		var routineEntity = (RoutineEntity) ast.decl.entity;
 		routineEntity.encodeCall(emitter, frame);
-		return null;
+		debugVisitEnd();
+        return null;
 	}
 
 	// Value-or-variable names
 	@Override
 	public RuntimeEntity visitDotVname(DotVname ast, Frame frame) {
+        debugVisitStart(ast);
 		var baseObject = ast.V.visit(this, frame);
 		ast.offset = ast.V.offset + ((Field) ast.I.decl.entity).getFieldOffset();
 		// I.decl points to the appropriate record field
 		ast.indexed = ast.V.indexed;
-		return baseObject;
+		debugVisitEnd();
+        return baseObject;
 	}
 
 	@Override
 	public RuntimeEntity visitSimpleVname(SimpleVname ast, Frame frame) {
+        debugVisitStart(ast);
 		ast.offset = 0;
 		ast.indexed = false;
-		return ast.I.decl.entity;
+		debugVisitEnd();
+        return ast.I.decl.entity;
 	}
 
 	@Override
 	public RuntimeEntity visitSubscriptVname(SubscriptVname ast, Frame frame) {
+        debugVisitStart(ast);
 		var baseObject = ast.V.visit(this, frame);
 		ast.offset = ast.V.offset;
 		ast.indexed = ast.V.indexed;
@@ -650,13 +785,16 @@ public final class Encoder implements ActualParameterVisitor<Frame, Integer>,
 				ast.indexed = true;
 			}
 		}
-		return baseObject;
+		debugVisitEnd();
+        return baseObject;
 	}
 
 	// Programs
 	@Override
 	public Void visitProgram(Program ast, Frame frame) {
-		return ast.C.visit(this, frame);
+        debugVisitStart(ast);
+		debugVisitEnd();
+        return ast.C.visit(this, frame);
 	}
 
 	public Encoder(Emitter emitter, ErrorReporter reporter) {
@@ -795,5 +933,14 @@ public final class Encoder implements ActualParameterVisitor<Frame, Integer>,
 
 		var baseObject = (AddressableEntity) V.visit(this, frame);
 		baseObject.encodeFetchAddress(emitter, frame, V);
+	}
+
+
+	public void debugVisitStart(AbstractSyntaxTree ast) {
+		if (debugPositionEmitter != null) debugPositionEmitter.enter(ast);
+	}
+
+	public void debugVisitEnd() {
+		if (debugPositionEmitter != null) debugPositionEmitter.exit();
 	}
 }

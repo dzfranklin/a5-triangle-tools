@@ -63,5 +63,6 @@ local.properties
 
 # Triangle build artifacts
 *.tam
+*.tam.dbg
 
 /build/

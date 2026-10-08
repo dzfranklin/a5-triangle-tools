@@ -22,6 +22,8 @@ public class SourcePosition {
 
 	public int start, finish;
 
+	public int index, length;
+
 	public SourcePosition() {
 		start = 0;
 		finish = 0;

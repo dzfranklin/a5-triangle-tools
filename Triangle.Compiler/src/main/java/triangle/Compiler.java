@@ -22,6 +22,7 @@ import triangle.abstractSyntaxTrees.Program;
 import triangle.codeGenerator.Emitter;
 import triangle.codeGenerator.Encoder;
 import triangle.contextualAnalyzer.Checker;
+import triangle.debug.DebugPositionEmitter;
 import triangle.optimiser.ConstantFolder;
 import triangle.syntacticAnalyzer.Parser;
 import triangle.syntacticAnalyzer.Scanner;
@@ -83,6 +84,10 @@ public class Compiler {
 		encoder = new Encoder(emitter, reporter);
 		drawer = new Drawer();
 
+		DebugPositionEmitter debugPositionEmitter = new DebugPositionEmitter(sourceName);
+		encoder.setDebugPositionEmitter(debugPositionEmitter);
+		emitter.setDebugPositionEmitter(debugPositionEmitter);
+
 		// scanner.enableDebugging();
 		theAST = parser.parseProgram(); // 1st pass
 		if (reporter.getNumErrors() == 0) {
@@ -107,6 +112,9 @@ public class Compiler {
 		boolean successful = (reporter.getNumErrors() == 0);
 		if (successful) {
 			emitter.saveObjectProgram(objectName);
+
+			debugPositionEmitter.save(objectName);
+
 			System.out.println("Compilation was successful.");
 		} else {
 			System.out.println("Compilation was unsuccessful.");

@@ -68,4 +68,24 @@ public class Instruction {
 			return null;
 		}
 	}
+
+	public String toString() {
+		return this.opCode + " " + this.register + " " + this.length + " " + this.operand;
+	}
+
+	public int getOperand() {
+		return operand;
+	}
+
+	public Register getRegister() {
+		return register;
+	}
+
+	public int getLength() {
+		return length;
+	}
+
+	public OpCode getOpCode() {
+		return opCode;
+	}
 }

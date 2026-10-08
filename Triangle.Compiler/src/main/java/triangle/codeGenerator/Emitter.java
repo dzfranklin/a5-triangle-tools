@@ -11,6 +11,7 @@ import triangle.abstractMachine.Machine;
 import triangle.abstractMachine.OpCode;
 import triangle.abstractMachine.Primitive;
 import triangle.abstractMachine.Register;
+import triangle.debug.DebugPositionEmitter;
 
 public class Emitter {
 
@@ -25,9 +26,15 @@ public class Emitter {
 
 	int nextInstrAddr;
 
+	DebugPositionEmitter debugPositionEmitter;
+
 	public Emitter(ErrorReporter errorReporter) {
 		this.errorReporter = errorReporter;
 		nextInstrAddr = Machine.CB;
+	}
+
+	public void setDebugPositionEmitter(DebugPositionEmitter emitter) {
+		debugPositionEmitter = emitter;
 	}
 
 	public int getNextInstrAddr() {
@@ -89,6 +96,7 @@ public class Emitter {
 			errorReporter.reportRestriction("too many instructions for code segment");
 		} else {
 			Machine.code[nextInstrAddr++] = nextInstr;
+			debugPositionEmitter.emit(currentInstrAddr);
 		}
 		return currentInstrAddr;
 

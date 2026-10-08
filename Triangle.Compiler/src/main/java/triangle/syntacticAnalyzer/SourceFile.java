@@ -18,8 +18,6 @@
 
 package triangle.syntacticAnalyzer;
 
-import java.net.URL;
-
 public class SourceFile {
 
 	public static final char EOL = '\n';
@@ -28,6 +26,7 @@ public class SourceFile {
 	java.io.File sourceFile;
 	java.io.InputStream source;
 	int currentLine;
+	int currentIndex = -1;
 
 	public static SourceFile ofPath(String pathname) {
 		try {
@@ -55,6 +54,8 @@ public class SourceFile {
 		try {
 			int c = source.read();
 
+			if (c != -1) currentIndex++;
+
 			if (c == -1) {
 				c = EOT;
 			} else if (c == EOL) {
@@ -68,5 +69,9 @@ public class SourceFile {
 
 	int getCurrentLine() {
 		return currentLine;
+	}
+
+	int getCurrentIndex() {
+		return currentIndex;
 	}
 }

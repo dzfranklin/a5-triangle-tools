@@ -119,6 +119,7 @@ public class Parser {
 
 	void start(SourcePosition position) {
 		position.start = currentToken.position.start;
+		position.index = currentToken.position.index;
 	}
 
 	// finish records the position of the end of a phrase.
@@ -127,6 +128,7 @@ public class Parser {
 
 	void finish(SourcePosition position) {
 		position.finish = previousTokenPosition.finish;
+		position.length = previousTokenPosition.index + previousTokenPosition.length - position.index;
 	}
 
 	void syntacticError(String messageTemplate, String tokenQuoted) throws SyntaxError {
@@ -147,6 +149,8 @@ public class Parser {
 
 		previousTokenPosition.start = 0;
 		previousTokenPosition.finish = 0;
+		previousTokenPosition.index = 0;
+		previousTokenPosition.length = 0;
 		currentToken = lexicalAnalyser.scan();
 
 		try {
